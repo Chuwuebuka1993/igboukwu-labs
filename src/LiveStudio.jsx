@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import * as Tone from "tone";
 import bronzePot from "./assets/branding/igbo_ukwu_pot.jpg";
 
