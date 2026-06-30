@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import CreatePage from './CreatePage';
 import LiveStudio from './LiveStudio';
+import ErrorBoundary from './ErrorBoundary';
 
 export default function App() {
   const [started, setStarted] = useState(false);
@@ -15,5 +16,9 @@ export default function App() {
     return <CreatePage onCreate={handleCreate} />;
   }
 
-  return <LiveStudio initialPrompt={initialPrompt} />;
+  return (
+    <ErrorBoundary>
+      <LiveStudio initialPrompt={initialPrompt} />
+    </ErrorBoundary>
+  );
 }
