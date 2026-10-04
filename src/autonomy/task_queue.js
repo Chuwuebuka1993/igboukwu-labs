@@ -2,6 +2,13 @@ const ALLOWED_KINDS = new Set(["audit", "test", "research", "build"]);
 const ALLOWED_RISKS = new Set(["low", "medium", "high"]);
 const STATUSES = new Set(["queued", "running", "completed", "blocked"]);
 
+const ALLOWED_TRANSITIONS = new Map([
+  ["queued", new Set(["running"])],
+  ["running", new Set(["completed", "blocked"])],
+  ["completed", new Set()],
+  ["blocked", new Set()],
+]);
+
 export function createTask({ id, title, kind, risk }) {
   if (!id || !title) throw new TypeError("id and title are required");
   if (!ALLOWED_KINDS.has(kind)) throw new RangeError("unsupported task kind");
@@ -15,6 +22,17 @@ export function nextTask(queue) {
     .filter((task) => task && task.status === "queued")
     .slice()
     .sort((a, b) => a.id.localeCompare(b.id))[0] ?? null;
+}
+
+export function transitionTask(task, nextStatus) {
+  if (!task || typeof task !== "object") throw new TypeError("task must be an object");
+  if (!STATUSES.has(task.status) || !STATUSES.has(nextStatus)) {
+    throw new RangeError("invalid task status");
+  }
+  if (!ALLOWED_TRANSITIONS.get(task.status).has(nextStatus)) {
+    throw new Error("invalid task status transition");
+  }
+  return { ...task, status: nextStatus };
 }
 
 export function summarizeRun({ taskId, testsPassed, testsFailed, reproduction, evidenceState }) {
@@ -33,4 +51,4 @@ export function summarizeRun({ taskId, testsPassed, testsFailed, reproduction, e
   };
 }
 
-export { ALLOWED_KINDS, ALLOWED_RISKS, STATUSES };
+export { ALLOWED_KINDS, ALLOWED_RISKS, STATUSES, ALLOWED_TRANSITIONS };
