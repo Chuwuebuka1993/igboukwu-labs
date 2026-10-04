@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
-    "test": "node --test src/autonomy/task_queue.test.js"
+    "test": "node --test src/autonomy/*.test.js"
   },
   "dependencies": {
     "lucide-react": "^1.20.0",
