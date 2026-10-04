@@ -16,3 +16,4 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: node --test src/autonomy/task_queue.test.js
+      - run: node --test src/autonomy/acb001.test.js
