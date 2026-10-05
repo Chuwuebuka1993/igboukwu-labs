@@ -45,6 +45,10 @@ jobs:
             echo "::error::source_ref must be a branch, tag, or commit SHA."
             exit 2
           fi
+          if [[ "$TASK_ID" != "ADL-002" ]]; then
+            echo "::error::This workflow currently accepts only the explicitly authorized ADL-002 baseline task."
+            exit 2
+          fi
           printf 'Task: %s\nRequested source ref: %s\n' "$TASK_ID" "$SOURCE_REF"
 
       - name: Checkout private Afa-language source
