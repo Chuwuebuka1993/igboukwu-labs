@@ -1,0 +1,148 @@
+name: ADL-002 AFA baseline execution
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: "Authorized Lab task identifier"
+        required: true
+        default: "ADL-002"
+        type: string
+      source_ref:
+        description: "Afa-language branch, tag, or exact commit SHA to test"
+        required: true
+        default: "fix/gate0-parser-defects"
+        type: string
+  repository_dispatch:
+    types: [adl-002-baseline]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: adl-002-baseline-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  baseline:
+    name: Reproduce AFA baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TASK_ID: ${{ github.event.inputs.task_id || github.event.client_payload.task_id || 'ADL-002' }}
+      SOURCE_REF: ${{ github.event.inputs.source_ref || github.event.client_payload.source_ref || 'fix/gate0-parser-defects' }}
+      RUN_ID: ${{ github.run_id }}
+      RUN_ATTEMPT: ${{ github.run_attempt }}
+    steps:
+      - name: Checkout Igboukwu Labs workflow repository
+        uses: actions/checkout@v4
+
+      - name: Validate source reference input
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$SOURCE_REF" || "$SOURCE_REF" == -* ]]; then
+            echo "::error::source_ref must be a branch, tag, or commit SHA."
+            exit 2
+          fi
+          if [[ "$TASK_ID" != "ADL-002" ]]; then
+            echo "::error::This workflow currently accepts only the explicitly authorized ADL-002 baseline task."
+            exit 2
+          fi
+          printf 'Task: %s\nRequested source ref: %s\n' "$TASK_ID" "$SOURCE_REF"
+
+      - name: Checkout private Afa-language source
+        uses: actions/checkout@v4
+        with:
+          repository: Chuwuebuka1993/Afa-language
+          ref: ${{ env.SOURCE_REF }}
+          token: ${{ secrets.AFA_REPOSITORY_TOKEN }}
+          path: afa-source
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Capture environment and source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          cd afa-source
+          printf '%s\n' "$TASK_ID" > ../evidence/task-id.txt
+          printf '%s\n' "https://github.com/Chuwuebuka1993/Afa-language" > ../evidence/repository-url.txt
+          git remote get-url origin | sed -E 's#https://[^/@]+:[^/@]+@#https://REDACTED@#' > ../evidence/remote-url.txt
+          git rev-parse HEAD > ../evidence/source-commit.txt
+          git rev-parse --abbrev-ref HEAD > ../evidence/source-branch.txt
+          git log -1 --format='%H%n%aI%n%s' > ../evidence/source-commit-metadata.txt
+          git ls-files | LC_ALL=C sort > ../evidence/file-manifest.txt
+          python --version > ../evidence/python-version.txt 2>&1
+          python -c 'import platform,sys; print("implementation="+platform.python_implementation()); print("version="+sys.version.replace("\n"," ")); print("platform="+platform.platform()); print("machine="+platform.machine())' > ../evidence/runtime-environment.txt
+          uname -a > ../evidence/runner-uname.txt
+          printf '%s\n' "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > ../evidence/workflow-run-url.txt
+          printf '%s\n' "$SOURCE_REF" > ../evidence/requested-source-ref.txt
+
+      - name: Execute the fixed AFA baseline test command
+        id: baseline
+        shell: bash
+        run: |
+          set -uo pipefail
+          cd afa-source
+          set +e
+          python -m unittest discover -s tests -v 2>&1 | tee ../evidence/test-output.log
+          test_exit=${PIPESTATUS[0]}
+          set -e
+          printf '%s\n' "$test_exit" > ../evidence/exit-code.txt
+          if [[ "$test_exit" -eq 0 ]]; then
+            echo "result=PASS" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=FAIL" >> "$GITHUB_OUTPUT"
+          fi
+          exit "$test_exit"
+
+      - name: Build machine-readable evidence summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, pathlib, re, hashlib, datetime
+          root = pathlib.Path("evidence")
+          log_path = root / "test-output.log"
+          log = log_path.read_text(errors="replace") if log_path.exists() else ""
+          exit_path = root / "exit-code.txt"
+          exit_code = int(exit_path.read_text().strip()) if exit_path.exists() else None
+          ran = re.search(r"Ran (\d+) tests? in", log)
+          failures = re.search(r"failures=(\d+)", log)
+          errors = re.search(r"errors=(\d+)", log)
+          summary = {
+            "schema": "adl-002-baseline-evidence/v1",
+            "task_id": os.environ.get("TASK_ID", "ADL-002"),
+            "repository": "Chuwuebuka1993/Afa-language",
+            "requested_ref": os.environ.get("SOURCE_REF"),
+            "commit_sha": (root / "source-commit.txt").read_text().strip() if (root / "source-commit.txt").exists() else None,
+            "command": "python -m unittest discover -s tests -v",
+            "exit_code": exit_code,
+            "tests_run": int(ran.group(1)) if ran else None,
+            "tests_failed": int(failures.group(1)) if failures else (0 if exit_code == 0 and ran else None),
+            "tests_errored": int(errors.group(1)) if errors else (0 if exit_code == 0 and ran else None),
+            "execution_result": "PASS" if exit_code == 0 and ran else ("FAIL" if exit_code is not None else "INCOMPLETE"),
+            "evidence_state": "CAPTURED" if exit_code is not None else "INCOMPLETE",
+            "verified": False,
+            "scientifically_verified": False,
+            "approval_required": True,
+            "workflow_run_id": os.environ.get("RUN_ID"),
+            "workflow_run_attempt": os.environ.get("RUN_ATTEMPT"),
+            "captured_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "test_log_sha256": hashlib.sha256(log.encode()).hexdigest() if log_path.exists() else None,
+          }
+          (root / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+          PY
+          (cd evidence && sha256sum * > SHA256SUMS.txt)
+
+      - name: Upload immutable run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adl-002-baseline-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 90
