@@ -1,0 +1,69 @@
+{
+  "schema": "ALPHA-PROJECT-STATE/v1",
+  "project": "igboukwu-labs",
+  "current_milestone": "M3",
+  "milestone_status": "active",
+  "completed_work": [
+    "M1 deterministic task control",
+    "M2 controlled processor",
+    "ADL-001 foundation benchmark verified"
+  ],
+  "active_tasks": [
+    {
+      "id": "ADL-002",
+      "title": "Repository intelligence and autonomous control plane",
+      "status": "in_review"
+    }
+  ],
+  "blocked_tasks": [],
+  "approved_tasks": [
+    "ADL-002",
+    "ADL-003",
+    "ADL-004",
+    "ADL-005",
+    "ADL-006",
+    "ADL-007",
+    "ADL-008",
+    "ADL-009"
+  ],
+  "research_queue": [],
+  "evidence_queue": [
+    {
+      "id": "EVID-ADL-002-001",
+      "type": "implementation",
+      "state": "TESTED_PENDING_CI"
+    }
+  ],
+  "open_proposals": [],
+  "experiments": [],
+  "benchmarks": [
+    {
+      "id": "ACB-001-FOUNDATION",
+      "state": "VERIFIED",
+      "score": 100,
+      "scope": "foundation test specification"
+    }
+  ],
+  "repositories": [
+    "Chuwuebuka1993/igboukwu-labs",
+    "Chuwuebuka1993/Afa-language"
+  ],
+  "test_status": "ci_running",
+  "known_failures": [],
+  "unresolved_questions": [
+    "Repository intelligence must inspect code, tests, workflows, evidence, and project state automatically.",
+    "Autonomous repair and PR generation must be wired after ADL-002."
+  ],
+  "next_actions": [
+    "Complete ADL-002 CI verification",
+    "Connect repository inspection to task queue",
+    "Add research/evidence ingestion",
+    "Generate approval-bound proposals",
+    "Implement autonomous engineering and repair loop"
+  ],
+  "authority": {
+    "human_merge_required": true,
+    "human_release_required": true,
+    "provenance_autonomous_write": false
+  }
+}
