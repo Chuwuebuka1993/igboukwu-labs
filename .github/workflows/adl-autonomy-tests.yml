@@ -35,3 +35,12 @@ jobs:
         run: npm ci
       - name: Run ADL test suite
         run: npm test
+      - name: Generate commit-pinned repository snapshot
+        run: node scripts/adl/create-repository-snapshot.mjs
+      - name: Upload repository snapshot evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: adl-repository-snapshot
+          path: artifacts/adl-repository-snapshot.json
+          if-no-files-found: error
+          retention-days: 14
