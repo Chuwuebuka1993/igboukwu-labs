@@ -83,8 +83,6 @@ export function inspectRepository({ repository, commitSha, files, workflows = []
   const blockers = Object.entries(gates)
     .filter(([name, passed]) => name !== "approvalRequired" && passed === false)
     .map(([name]) => name);
-  if (gates.approvalRequired) blockers.push("human approval is not represented by repository inspection");
-
   return {
     schema: "ADL-REPOSITORY-SNAPSHOT/v1",
     repository: repo,
@@ -102,6 +100,7 @@ export function inspectRepository({ repository, commitSha, files, workflows = []
     authority: {
       inspectionIsReadOnly: true,
       humanApprovalRequiredForWrites: true,
+      writeBlockedUntilExplicitApproval: true,
       humanMergeRequired: true,
       humanReleaseRequired: true,
     },
