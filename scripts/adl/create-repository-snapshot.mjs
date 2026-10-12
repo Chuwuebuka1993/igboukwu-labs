@@ -52,7 +52,7 @@ writeFileSync(outputPath, JSON.stringify(snapshot, null, 2) + "\n", "utf8");
 process.stdout.write(JSON.stringify({
   output: relative(root, outputPath),
   commitSha,
-  fileCount: snapshot.inventory.source.length + snapshot.inventory.tests.length,
+  sourceAndTestFileCount: snapshot.inventory.source.length + snapshot.inventory.tests.length,
   ciStatus: snapshot.ci.status,
   blockerCount: snapshot.blockers.length,
   readyForAutonomousWrite: snapshot.readyForAutonomousWrite,
