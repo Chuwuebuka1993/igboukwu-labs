@@ -75,7 +75,16 @@ test("checkpoint store rejects malformed checkpoint identity and status", async 
   await withTempDir(async (directory) => {
     const path = join(directory, "checkpoint.json");
     await assert.rejects(
-      saveCheckpoint(path, { taskId: "x", repository: "owner/repo", commitSha: "bad" }),
+      saveCheckpoint(path, {
+        taskId: "x",
+        repository: "owner/repo",
+        commitSha: "bad",
+        phase: "inspection",
+        status: "paused",
+        completedSteps: [],
+        nextStep: "fetch_tree",
+        approval: { required: true, granted: false },
+      }),
       /40-character commit SHA/,
     );
   });
