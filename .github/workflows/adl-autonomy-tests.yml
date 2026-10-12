@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "src/autonomy/**"
+      - "scripts/adl/**"
+      - "autonomy/PROJECT_STATE.json"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/adl-autonomy-tests.yml"
@@ -12,6 +14,8 @@ on:
       - "autonomous/**"
     paths:
       - "src/autonomy/**"
+      - "scripts/adl/**"
+      - "autonomy/PROJECT_STATE.json"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/adl-autonomy-tests.yml"
