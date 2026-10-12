@@ -31,11 +31,14 @@ test("checkpoint store persists and reloads a versioned resumable state", async 
     await saveCheckpoint(path, checkpoint);
     const loaded = await loadCheckpoint(path);
 
-    assert.deepEqual(loaded, {
-      schema: "ADL-CHECKPOINT/v1",
-      revision: 1,
-      ...checkpoint,
-    });
+    assert.equal(loaded.schema, "ADL-CHECKPOINT/v1");
+    assert.equal(loaded.revision, 1);
+    assert.equal(loaded.taskId, checkpoint.taskId);
+    assert.equal(loaded.repository, checkpoint.repository);
+    assert.equal(loaded.commitSha, checkpoint.commitSha);
+    assert.equal(loaded.nextStep, checkpoint.nextStep);
+    assert.equal(loaded.approval.granted, false);
+    assert.equal(typeof loaded.updatedAt, "string");
   });
 });
 
@@ -96,5 +99,24 @@ test("persisted checkpoint is valid JSON and never includes an approval grant by
     const raw = JSON.parse(await readFile(path, "utf8"));
     assert.equal(raw.approval.granted, false);
     assert.equal(raw.schema, "ADL-CHECKPOINT/v1");
+  });
+});
+
+test("checkpoint store blocks an implementation run without explicit approval", async () => {
+  await withTempDir(async (directory) => {
+    const path = join(directory, "checkpoint.json");
+    await assert.rejects(
+      saveCheckpoint(path, {
+        taskId: "ADL-004-004",
+        repository: "owner/repo",
+        commitSha: "d".repeat(40),
+        phase: "implementation",
+        status: "running",
+        completedSteps: [],
+        nextStep: "execute",
+        approval: { required: true, granted: false },
+      }),
+      /without explicit approval/,
+    );
   });
 });
