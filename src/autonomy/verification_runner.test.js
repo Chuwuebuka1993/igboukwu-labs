@@ -36,8 +36,8 @@ test("verification runner executes only an allowlisted command without a shell",
 });
 
 test("verification runner rejects arbitrary commands", async () => {
-  await assert.rejects(
-    runVerificationCommand({ command: "rm -rf /", cwd: "/workspace/repo" }),
+  assert.throws(
+    () => runVerificationCommand({ command: "rm -rf /", cwd: "/workspace/repo" }),
     /not allowlisted/,
   );
 });
@@ -55,8 +55,8 @@ test("verification runner records non-zero exit as failure", async () => {
 });
 
 test("verification runner rejects invalid working directory", async () => {
-  await assert.rejects(
-    runVerificationCommand({ command: "npm test", cwd: "" }),
+  assert.throws(
+    () => runVerificationCommand({ command: "npm test", cwd: "" }),
     /cwd must be an absolute path/,
   );
 });
