@@ -206,7 +206,7 @@ test("overlapping verification calls cannot execute the same run twice", async (
       runner: async ({ command }) => {
         commandCount += 1;
         return command === "git rev-parse HEAD"
-          ? { status: "passed", exitCode: 0, stdout: COMMIT + "\\n", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null }
+          ? { status: "passed", exitCode: 0, stdout: COMMIT + "\n", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null }
           : { status: "passed", exitCode: 0, stdout: "tests passed", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null };
       },
     });
