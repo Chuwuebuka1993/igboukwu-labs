@@ -148,3 +148,16 @@ test("captured output redacts common GitHub token formats", async () => {
     assert.match(result.evidence.result.stdout, /REDACTED/);
   });
 });
+
+
+test("verification job rejects ambiguous surrounding whitespace in command metadata", async () => {
+  await withTempDir(async (directory) => {
+    let inspected = false;
+    const options = input(directory, {
+      command: " npm test ",
+      adapter: { async inspectRepository() { inspected = true; return { repository: REPOSITORY, commitSha: COMMIT, blockers: [], gates: { treeComplete: true } }; } },
+    });
+    await assert.rejects(runPinnedVerification(options), /command must not have surrounding whitespace/);
+    assert.equal(inspected, false);
+  });
+});
