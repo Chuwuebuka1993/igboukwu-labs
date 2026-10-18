@@ -186,3 +186,36 @@ test("verification job refuses to execute without a trusted sandbox adapter", as
     assert.equal(inspected, false);
   });
 });
+
+
+test("overlapping verification calls cannot execute the same run twice", async () => {
+  await withTempDir(async (directory) => {
+    let announceInspection;
+    let releaseInspection;
+    const inspectionStarted = new Promise((resolve) => { announceInspection = resolve; });
+    const inspectionGate = new Promise((resolve) => { releaseInspection = resolve; });
+    let commandCount = 0;
+    const options = input(directory, {
+      adapter: {
+        async inspectRepository() {
+          announceInspection();
+          await inspectionGate;
+          return { repository: REPOSITORY, commitSha: COMMIT, blockers: [], gates: { treeComplete: true } };
+        },
+      },
+      runner: async ({ command }) => {
+        commandCount += 1;
+        return command === "git rev-parse HEAD"
+          ? { status: "passed", exitCode: 0, stdout: COMMIT + "\n", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null }
+          : { status: "passed", exitCode: 0, stdout: "tests passed", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null };
+      },
+    });
+    const first = runPinnedVerification(options);
+    await inspectionStarted;
+    await assert.rejects(runPinnedVerification(options), /run lease already exists/);
+    releaseInspection();
+    const result = await first;
+    assert.equal(result.status, "TESTS_PASSED");
+    assert.equal(commandCount, 2, "only the lease owner should run HEAD check and verification command");
+  });
+});
