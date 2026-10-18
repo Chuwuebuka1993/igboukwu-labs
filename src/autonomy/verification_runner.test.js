@@ -81,3 +81,28 @@ test("verification runner requires an explicit approved workspace root", () => {
     /workspaceRoot must be an absolute path/,
   );
 });
+
+
+test("verification runner fails closed when captured output exceeds the configured limit", async () => {
+  const result = await runVerificationCommand({
+    command: "npm test",
+    cwd: "/tmp/workspace/repo",
+    workspaceRoot: "/tmp/workspace",
+    maxOutputBytes: 4,
+    spawnImpl: () => fakeChild({ stdout: "output is too large", code: 0 }),
+  });
+  assert.equal(result.status, "failed");
+  assert.equal(result.outputLimitExceeded, true);
+});
+
+test("verification runner records timeout as failure", async () => {
+  const result = await runVerificationCommand({
+    command: "npm test",
+    cwd: "/tmp/workspace/repo",
+    workspaceRoot: "/tmp/workspace",
+    timeoutMs: 5,
+    spawnImpl: () => fakeChild({ stdout: "still running", code: 0, delay: 20 }),
+  });
+  assert.equal(result.status, "failed");
+  assert.equal(result.timedOut, true);
+});

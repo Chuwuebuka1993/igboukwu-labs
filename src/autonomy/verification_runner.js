@@ -5,6 +5,7 @@ const ALLOWLIST = new Map([
   ["npm test", { file: "npm", args: ["test"] }],
   ["npm run build", { file: "npm", args: ["run", "build"] }],
   ["git diff --check", { file: "git", args: ["diff", "--check"] }],
+  ["git rev-parse HEAD", { file: "git", args: ["rev-parse", "HEAD"] }],
 ]);
 
 /**
