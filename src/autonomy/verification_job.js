@@ -12,7 +12,10 @@ function requireText(value, field) {
   if (typeof value !== "string" || value.trim() === "") {
     throw new TypeError(field + " is required");
   }
-  return value.trim();
+  if (value !== value.trim()) {
+    throw new TypeError(field + " must not have surrounding whitespace");
+  }
+  return value;
 }
 
 function isInside(root, candidate) {
@@ -121,7 +124,7 @@ export async function runPinnedVerification(input = {}) {
 
   const authorization = input.authorization;
   if (!authorization || authorization.approved !== true ||
-      typeof authorization.approvalId !== "string" || authorization.approvalId.trim() === "" ||
+      typeof authorization.approvalId !== "string" || authorization.approvalId.trim() === "" || authorization.approvalId !== authorization.approvalId.trim() ||
       authorization.taskId !== taskId || authorization.repository !== repository ||
       authorization.ref !== ref || !Array.isArray(authorization.allowedCommands) ||
       !authorization.allowedCommands.includes(command)) {
