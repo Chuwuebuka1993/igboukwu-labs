@@ -22,7 +22,7 @@ function input(directory, overrides = {}) {
   const taskId = "ADL-005-TEST";
   const repository = REPOSITORY;
   const ref = "main";
-  return {
+  const options = {
     taskId,
     repository,
     ref,
@@ -52,14 +52,26 @@ function input(directory, overrides = {}) {
       },
     },
     runner: async ({ command }) => command === "git rev-parse HEAD"
-      ? { status: "passed", exitCode: 0, stdout: COMMIT + "\n", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null }
+      ? { status: "passed", exitCode: 0, stdout: COMMIT + "\\n", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null }
       : { status: "passed", exitCode: 0, stdout: "44 tests passed", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null },
     now: (() => {
       let tick = 0;
       return () => new Date(Date.UTC(2026, 9, 18, 10, 0, tick++)).toISOString();
     })(),
-    ...overrides,
   };
+  Object.assign(options, overrides);
+  if (Object.prototype.hasOwnProperty.call(overrides, "sandbox")) {
+    options.sandbox = overrides.sandbox;
+  } else {
+    options.sandbox = {
+      profileId: "test-sandbox",
+      isolation: "container",
+      verified: true,
+      workspaceRoot: options.workspaceRoot,
+      run: (args) => options.runner(args),
+    };
+  }
+  return options;
 }
 
 test("pinned verification records the exact commit, approval, command, and content hash", async () => {
@@ -158,6 +170,19 @@ test("verification job rejects ambiguous surrounding whitespace in command metad
       adapter: { async inspectRepository() { inspected = true; return { repository: REPOSITORY, commitSha: COMMIT, blockers: [], gates: { treeComplete: true } }; } },
     });
     await assert.rejects(runPinnedVerification(options), /command must not have surrounding whitespace/);
+    assert.equal(inspected, false);
+  });
+});
+
+
+test("verification job refuses to execute without a trusted sandbox adapter", async () => {
+  await withTempDir(async (directory) => {
+    let inspected = false;
+    const options = input(directory, {
+      sandbox: null,
+      adapter: { async inspectRepository() { inspected = true; return { repository: REPOSITORY, commitSha: COMMIT, blockers: [], gates: { treeComplete: true } }; } },
+    });
+    await assert.rejects(runPinnedVerification(options), /trusted sandbox adapter is required/);
     assert.equal(inspected, false);
   });
 });
