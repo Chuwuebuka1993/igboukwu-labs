@@ -46,7 +46,8 @@ test("verification runner rejects arbitrary commands", async () => {
 test("verification runner records non-zero exit as failure", async () => {
   const result = await runVerificationCommand({
     command: "npm test",
-    cwd: "/workspace/repo",
+    cwd: "/tmp/workspace/repo",
+    workspaceRoot: "/tmp/workspace",
     spawnImpl: () => fakeChild({ stderr: "test failure", code: 1 }),
   });
 
