@@ -91,7 +91,7 @@ test("workspace commit mismatch blocks verification before the requested command
     }));
     assert.equal(result.status, "BLOCKED");
     assert.deepEqual(calls, ["git rev-parse HEAD"]);
-    assert.equal(result.evidence.reason, "workspace_commit_mismatch");
+    assert.equal(result.reason, "workspace_commit_mismatch");
     const checkpoint = JSON.parse(await readFile(join(directory, "state", "run-001.json"), "utf8"));
     assert.equal(checkpoint.status, "blocked");
   });
@@ -131,7 +131,7 @@ test("duplicate run evidence is rejected before any command is executed", async 
     let commandCount = 0;
     await assert.rejects(
       runPinnedVerification({ ...options, runner: async () => { commandCount++; throw new Error("must not run"); } }),
-      /evidence path already exists; reconcile the existing run before retrying/,
+      /already exists; reconcile the existing run before retrying/,
     );
     assert.equal(commandCount, 0);
   });
