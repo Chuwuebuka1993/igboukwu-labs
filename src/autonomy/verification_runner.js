@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { isAbsolute } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 
 const ALLOWLIST = new Map([
   ["npm test", { file: "npm", args: ["test"] }],
@@ -14,14 +14,24 @@ const ALLOWLIST = new Map([
 export function runVerificationCommand({
   command,
   cwd,
+  workspaceRoot,
   timeoutMs = 120_000,
   maxOutputBytes = 1_000_000,
   spawnImpl = spawn,
 } = {}) {
   const allowed = ALLOWLIST.get(command);
   if (!allowed) throw new Error("command is not allowlisted for verification");
+  if (typeof workspaceRoot !== "string" || !isAbsolute(workspaceRoot)) {
+    throw new TypeError("workspaceRoot must be an absolute path");
+  }
   if (typeof cwd !== "string" || !isAbsolute(cwd)) {
     throw new TypeError("cwd must be an absolute path");
+  }
+  const approvedRoot = resolve(workspaceRoot);
+  const workingDirectory = resolve(cwd);
+  const workspaceRelativePath = relative(approvedRoot, workingDirectory);
+  if (workspaceRelativePath === ".." || workspaceRelativePath.startsWith(".." + sep) || isAbsolute(workspaceRelativePath)) {
+    throw new Error("cwd must be inside the approved workspace");
   }
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1) throw new RangeError("timeoutMs must be positive");
   if (!Number.isInteger(maxOutputBytes) || maxOutputBytes < 1) throw new RangeError("maxOutputBytes must be positive");
@@ -42,7 +52,8 @@ export function runVerificationCommand({
       clearTimeout(timer);
       resolve({
         command,
-        cwd,
+        cwd: workingDirectory,
+        workspaceRoot: approvedRoot,
         ...result,
         stdout,
         stderr,
