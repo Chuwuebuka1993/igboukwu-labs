@@ -2,7 +2,6 @@ import { createHash, randomUUID } from "node:crypto";
 import { access, link, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { saveCheckpoint } from "./checkpoint_store.js";
-import { runVerificationCommand } from "./verification_runner.js";
 
 const SHA_PATTERN = /^[a-f0-9]{40}$/i;
 const SAFE_RUN_ID = /^[A-Za-z0-9._-]{1,100}$/;
@@ -75,6 +74,10 @@ function createEvidence(input, snapshot, status, details, startedAt, finishedAt,
       platform: process.platform,
       architecture: process.arch,
     },
+    sandbox: {
+      profileId: input.sandbox.profileId,
+      isolation: input.sandbox.isolation,
+    },
     workspace: {
       root: resolve(input.workspaceRoot),
       cwd: resolve(input.cwd),
@@ -119,7 +122,6 @@ export async function runPinnedVerification(input = {}) {
   if (!/^[^/\s]+\/[^/\s]+$/.test(repository)) throw new TypeError("repository must use owner/repo format");
   if (!SUPPORTED_COMMANDS.has(command)) throw new Error("command is not allowlisted for verification");
   if (typeof input.adapter?.inspectRepository !== "function") throw new TypeError("adapter.inspectRepository is required");
-  if (typeof input.runner !== "undefined" && typeof input.runner !== "function") throw new TypeError("runner must be a function");
   if (typeof input.now !== "undefined" && typeof input.now !== "function") throw new TypeError("now must be a function");
 
   const authorization = input.authorization;
@@ -145,11 +147,20 @@ export async function runPinnedVerification(input = {}) {
     throw new Error("checkpoint and evidence paths must be outside the checkout workspace");
   }
   if (checkpointPath === evidencePath) throw new Error("checkpointPath and evidencePath must be different");
+
+  const sandbox = input.sandbox;
+  if (!sandbox || typeof sandbox.run !== "function" ||
+      sandbox.verified !== true || !["container", "vm"].includes(sandbox.isolation) ||
+      typeof sandbox.profileId !== "string" || sandbox.profileId.trim() === "" ||
+      typeof sandbox.workspaceRoot !== "string" || resolve(sandbox.workspaceRoot) !== workspaceRoot) {
+    throw new Error("trusted sandbox adapter is required");
+  }
+
   await assertPathAbsent(checkpointPath, "checkpoint");
   await assertPathAbsent(evidencePath, "evidence path");
 
   const now = input.now ?? (() => new Date().toISOString());
-  const runner = input.runner ?? runVerificationCommand;
+  const runner = sandbox.run;
   const startedAt = now();
   const snapshot = await input.adapter.inspectRepository({ repository, ref });
   if (snapshot?.repository !== repository || typeof snapshot.commitSha !== "string" || !SHA_PATTERN.test(snapshot.commitSha)) {
