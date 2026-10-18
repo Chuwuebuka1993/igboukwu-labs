@@ -23,3 +23,12 @@ Supply a read-only GitHub token through the host's secret manager and pass it to
 ## Verification
 
 Run `npm test` in the repository. The ADL workflow should execute the full test suite on the pull request and attach the repository snapshot as a workflow artifact.
+
+
+## Verification runner boundary hardening (follow-up draft)
+
+The runner now requires an explicit absolute `workspaceRoot` and rejects a `cwd` that is lexically outside that root. This reduces accidental execution against unrelated directories.
+
+**This is not an OS-level sandbox.** Lexical path checks do not stop symlink escapes, and `npm test` / `npm run build` execute project-defined scripts. Before using this runner on untrusted repositories, run it in an isolated container or equivalent sandbox with least-privilege credentials, bounded filesystem/network access, and no production secrets. The caller must provide the approved workspace root and bind evidence to the exact checkout commit.
+
+The new boundary tests are authored but have not yet been executed in this environment. Do not mark ADL-004 verified until the repository's full `npm test` suite runs successfully on the exact commit and its CI evidence is inspected.
