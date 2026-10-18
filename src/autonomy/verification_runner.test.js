@@ -20,7 +20,8 @@ test("verification runner executes only an allowlisted command without a shell",
   let invocation;
   const result = await runVerificationCommand({
     command: "npm test",
-    cwd: "/workspace/repo",
+    cwd: "/tmp/workspace/repo",
+    workspaceRoot: "/tmp/workspace",
     spawnImpl: (file, args, options) => {
       invocation = { file, args, options };
       return fakeChild({ stdout: "tests passed", code: 0 });
@@ -56,7 +57,26 @@ test("verification runner records non-zero exit as failure", async () => {
 
 test("verification runner rejects invalid working directory", async () => {
   assert.throws(
-    () => runVerificationCommand({ command: "npm test", cwd: "" }),
+    () => runVerificationCommand({ command: "npm test", cwd: "", workspaceRoot: "/tmp/workspace" }),
     /cwd must be an absolute path/,
+  );
+});
+
+
+test("verification runner rejects a working directory outside the approved workspace", async () => {
+  assert.throws(
+    () => runVerificationCommand({
+      command: "npm test",
+      cwd: "/tmp/other-repo",
+      workspaceRoot: "/tmp/workspace",
+    }),
+    /inside the approved workspace/,
+  );
+});
+
+test("verification runner requires an explicit approved workspace root", () => {
+  assert.throws(
+    () => runVerificationCommand({ command: "npm test", cwd: "/tmp/workspace/repo" }),
+    /workspaceRoot must be an absolute path/,
   );
 });
