@@ -28,6 +28,7 @@ function input(directory, overrides = {}) {
     ref,
     runId: "run-001",
     command: "npm test",
+    agentPolicy: { role: "verifier", action: "run_tests" },
     workspaceRoot: join(directory, "workspace"),
     cwd: join(directory, "workspace", "checkout"),
     checkpointPath: join(directory, "state", "run-001.json"),
@@ -258,5 +259,34 @@ test("evidence persistence failure marks checkpoint failed and propagates the wr
     const checkpoint = JSON.parse(await fs.readFile(options.checkpointPath, "utf8"));
     assert.equal(checkpoint.status, "failed");
     assert.equal(checkpoint.nextStep, "reconcile_evidence_write");
+  });
+});
+
+
+test("verification refuses to inspect or execute without an explicit verifier role", async () => {
+  await withTempDir(async (directory) => {
+    let inspected = false;
+    let executed = false;
+    const options = input(directory, {
+      agentPolicy: undefined,
+      adapter: { async inspectRepository() { inspected = true; return { repository: REPOSITORY, commitSha: COMMIT, gates: { treeComplete: true } }; } },
+      runner: async () => { executed = true; return { status: "passed", exitCode: 0, stdout: "", stderr: "" }; },
+    });
+    delete options.agentPolicy;
+    await assert.rejects(runPinnedVerification(options), /requires explicit verifier role policy/);
+    assert.equal(inspected, false);
+    assert.equal(executed, false);
+  });
+});
+
+test("verification rejects a non-verifier role before repository inspection", async () => {
+  await withTempDir(async (directory) => {
+    let inspected = false;
+    const options = input(directory, {
+      agentPolicy: { role: "engineer", action: "run_tests" },
+      adapter: { async inspectRepository() { inspected = true; return { repository: REPOSITORY, commitSha: COMMIT, gates: { treeComplete: true } }; } },
+    });
+    await assert.rejects(runPinnedVerification(options), /requires explicit verifier role policy/);
+    assert.equal(inspected, false);
   });
 });
