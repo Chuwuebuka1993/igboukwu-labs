@@ -1,6 +1,22 @@
 import { summarizeRun, transitionTask } from "./task_queue.js";
+import { authorizeAgentAction } from "./agent_roles.js";
 
-export function runControlledTask(task, { execute }) {
+export function runControlledTask(task, { execute, policy } = {}) {
+  const authorization = authorizeAgentAction(policy);
+  if (!authorization.allowed) {
+    return {
+      task: { ...task },
+      run: summarizeRun({
+        taskId: task?.id ?? null,
+        testsPassed: 0,
+        testsFailed: 0,
+        reproduction: "DENIED:" + authorization.reason,
+        evidenceState: "BLOCKED",
+      }),
+      authorization,
+      executed: false,
+    };
+  }
   if (typeof execute !== "function") {
     throw new TypeError("execute must be a function");
   }
@@ -22,7 +38,7 @@ export function runControlledTask(task, { execute }) {
       evidenceState: "TESTED",
     });
 
-    return { task: completedTask, run };
+    return { task: completedTask, run, authorization, executed: true };
   } catch (error) {
     const blockedTask = transitionTask(runningTask, "blocked");
     const run = summarizeRun({
@@ -33,6 +49,6 @@ export function runControlledTask(task, { execute }) {
       evidenceState: "FAILED",
     });
 
-    return { task: blockedTask, run };
+    return { task: blockedTask, run, authorization, executed: true };
   }
 }

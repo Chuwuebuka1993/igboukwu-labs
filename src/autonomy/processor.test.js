@@ -12,6 +12,7 @@ test("processor executes an allowed local task and captures evidence", () => {
   });
 
   const result = runControlledTask(task, {
+    policy: { role: "verifier", action: "run_tests" },
     execute: () => ({ testsPassed: 1, testsFailed: 0, reproduction: "PASS" }),
   });
 
@@ -31,6 +32,7 @@ test("processor blocks a task when execution throws", () => {
   });
 
   const result = runControlledTask(task, {
+    policy: { role: "verifier", action: "run_tests" },
     execute: () => {
       throw new Error("controlled failure");
     },
@@ -41,4 +43,26 @@ test("processor blocks a task when execution throws", () => {
   assert.equal(result.run.testsFailed, 1);
   assert.equal(result.run.evidenceState, "FAILED");
   assert.equal(result.run.verified, false);
+});
+
+test("direct processor entry denies missing policy before execution", () => {
+  const task = createTask({ id: "ADL-EXEC-003", title: "Unscoped task", kind: "test", risk: "low" });
+  let calls = 0;
+  const result = runControlledTask(task, { execute: () => { calls += 1; return { testsPassed: 1, testsFailed: 0 }; } });
+  assert.equal(calls, 0);
+  assert.equal(result.executed, false);
+  assert.equal(result.run.evidenceState, "BLOCKED");
+  assert.equal(result.authorization.reason, "unknown_role");
+});
+
+test("direct processor entry denies human-only action even when executor is supplied", () => {
+  const task = createTask({ id: "ADL-EXEC-004", title: "Release attempt", kind: "test", risk: "low" });
+  let calls = 0;
+  const result = runControlledTask(task, {
+    policy: { role: "release_steward", action: "release" },
+    execute: () => { calls += 1; return { testsPassed: 1, testsFailed: 0 }; },
+  });
+  assert.equal(calls, 0);
+  assert.equal(result.executed, false);
+  assert.equal(result.authorization.reason, "human_only_action");
 });

@@ -3,6 +3,7 @@ import { access, link, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { saveCheckpoint } from "./checkpoint_store.js";
 import { acquireRunLease } from "./run_lease.js";
+import { authorizeAgentAction } from "./agent_roles.js";
 
 const SHA_PATTERN = /^[a-f0-9]{40}$/i;
 const SAFE_RUN_ID = /^[A-Za-z0-9._-]{1,100}$/;
@@ -119,6 +120,14 @@ async function runPinnedVerificationUnlocked(input = {}) {
   const ref = requireText(input.ref, "ref");
   const runId = requireText(input.runId, "runId");
   const command = requireText(input.command, "command");
+  // Independent verification must execute under the verifier role, even when
+  // a caller possesses a separate task-scoped human approval.
+  const agentPolicy = input.agentPolicy;
+  if (!agentPolicy || agentPolicy.role !== "verifier" || agentPolicy.action !== "run_tests") {
+    throw new Error("verification requires explicit verifier role policy");
+  }
+  const roleDecision = authorizeAgentAction(agentPolicy);
+  if (!roleDecision.allowed) throw new Error("agent role policy denied verification: " + roleDecision.reason);
   if (!SAFE_RUN_ID.test(runId)) throw new TypeError("runId contains unsupported characters");
   if (!/^[^/\s]+\/[^/\s]+$/.test(repository)) throw new TypeError("repository must use owner/repo format");
   if (!SUPPORTED_COMMANDS.has(command)) throw new Error("command is not allowlisted for verification");
