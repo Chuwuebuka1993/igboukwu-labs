@@ -32,6 +32,7 @@ test("processor blocks a task when execution throws", () => {
   });
 
   const result = runControlledTask(task, {
+    policy: { role: "verifier", action: "run_tests" },
     execute: () => {
       throw new Error("controlled failure");
     },
