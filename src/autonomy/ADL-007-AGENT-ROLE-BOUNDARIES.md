@@ -30,3 +30,10 @@ The registry does not itself grant or revoke GitHub permissions, authenticate an
 ```sh
 npm test
 ```
+
+
+## Execution-boundary integration (ADL-007 follow-through)
+
+`runRoleAuthorizedTask` now calls the role policy immediately before the controlled executor. On denial, it returns a `BLOCKED` result and does not invoke the supplied execution callback. Tests assert the callback is never called for missing approval, unverified evidence, or a human-only release action.
+
+This is an in-process enforcement point for callers that use this wrapper. It does not prevent code from bypassing the wrapper, and it does not replace OS sandboxing, credentials scoping, or GitHub repository permissions. Production integration must route all agent-originated task execution through this function and test for bypass paths.
