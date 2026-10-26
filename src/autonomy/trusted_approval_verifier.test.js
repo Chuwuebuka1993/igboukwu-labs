@@ -19,6 +19,18 @@ test("accepts exact, trusted, unexpired, one-time approval", async () => {
   assert.equal(r.taskId, request.taskId);
   assert.equal(r.action, request.action);
 });
+test("rejects records whose decision is not explicitly approved", async () => {
+  for (const decision of ["denied", "pending", "revoked", "", undefined]) {
+    const r = await verifyScopedApproval({ request, trustedHost: host({ loadApprovalRecord: async () => {
+      const value = { ...record };
+      if (decision === undefined) delete value.decision;
+      else value.decision = decision;
+      return value;
+    } }), now });
+    assert.equal(r.allowed, false, String(decision));
+    assert.equal(r.reason, "approval_decision_not_approved", String(decision));
+  }
+});
 test("rejects missing record", async () => {
   const r = await verifyScopedApproval({ request, trustedHost: host({ loadApprovalRecord: async () => null }), now });
   assert.equal(r.reason, "approval_record_not_found");
