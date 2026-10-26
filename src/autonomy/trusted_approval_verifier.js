@@ -30,6 +30,9 @@ export async function verifyScopedApproval({ request, trustedHost, now = Date.no
   if (REQUIRED_FIELDS.some((field) => !nonempty(record[field]))) {
     return { allowed: false, reason: "approval_record_malformed" };
   }
+  if (record.decision !== "approved") {
+    return { allowed: false, reason: "approval_decision_not_approved" };
+  }
   if (record.approvalId !== request.approvalId || record.taskId !== request.taskId ||
       record.proposalId !== request.proposalId || record.action !== request.action) {
     return { allowed: false, reason: "approval_scope_mismatch" };
