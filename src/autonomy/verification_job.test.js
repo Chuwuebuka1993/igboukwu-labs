@@ -248,8 +248,9 @@ test("evidence persistence failure marks checkpoint failed and propagates the wr
       if (command === "git rev-parse HEAD") {
         return { status: "passed", exitCode: 0, stdout: COMMIT + "\\n", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null };
       }
-      await fs.rm(evidenceParent, { recursive: true, force: true });
-      await fs.writeFile(evidenceParent, "replace evidence directory with a file", "utf8");
+      // Simulate a competing writer winning the exclusive artifact path after
+      // the preflight absence check but before the evidence hard-link is created.
+      await fs.writeFile(options.evidencePath, "competing artifact", { encoding: "utf8", flag: "wx" });
       return { status: "passed", exitCode: 0, stdout: "tests passed", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null };
     };
     await assert.rejects(runPinnedVerification(options));
