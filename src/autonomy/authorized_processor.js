@@ -24,6 +24,6 @@ export function runRoleAuthorizedTask(task, policy, { execute } = {}) {
     };
   }
   if (typeof execute !== "function") throw new TypeError("execute must be a function");
-  const result = runControlledTask(task, { execute });
+  const result = runControlledTask(task, { execute, policy });
   return { ...result, authorization: decision, executed: true };
 }
