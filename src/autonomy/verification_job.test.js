@@ -246,7 +246,7 @@ test("evidence persistence failure marks checkpoint failed and propagates the wr
     options.sandbox.run = async ({ command }) => {
       commandCount += 1;
       if (command === "git rev-parse HEAD") {
-        return { status: "passed", exitCode: 0, stdout: COMMIT + "\\n", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null };
+        return { status: "passed", exitCode: 0, stdout: COMMIT + "\n", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null };
       }
       // Simulate a competing writer winning the exclusive artifact path after
       // the preflight absence check but before the evidence hard-link is created.
