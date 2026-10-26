@@ -76,3 +76,24 @@ test("dispatch proceeds only after trusted scoped approval verification", async 
   assert.equal(result.result.executed, true);
   assert.equal(executions, 1);
 });
+
+
+test("control plane initializes dispatch tasks in the queued state", () => {
+  assert.equal(plane().task.status, "queued");
+});
+
+test("role-policy denial occurs before a single-use approval is consumed", async () => {
+  let consumes = 0;
+  let executions = 0;
+  const result = await dispatchPlannedAction(plane(), {
+    policy: { role: "researcher", action: "write_code", evidenceState: "IMPLEMENTED", proposalStatus: "approved" },
+    approvalId: approvalRecord.approvalId,
+    trustedHost: host({ consumeApproval: async () => { consumes += 1; return true; } }),
+    execute: () => { executions += 1; return { testsPassed: 1, testsFailed: 0 }; },
+    now,
+  });
+  assert.equal(result.dispatched, false);
+  assert.equal(result.reason, "role_scope_denied");
+  assert.equal(consumes, 0);
+  assert.equal(executions, 0);
+});
