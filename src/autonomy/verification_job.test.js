@@ -219,3 +219,43 @@ test("overlapping verification calls cannot execute the same run twice", async (
     assert.equal(commandCount, 2, "only the lease owner should run HEAD check and verification command");
   });
 });
+
+
+test("malformed existing checkpoint fails closed before repository inspection or execution", async () => {
+  await withTempDir(async (directory) => {
+    const options = input(directory);
+    await (await import("node:fs/promises")).mkdir(join(directory, "state"), { recursive: true });
+    await (await import("node:fs/promises")).writeFile(options.checkpointPath, "{ malformed checkpoint", "utf8");
+    let inspected = false;
+    let commands = 0;
+    options.adapter = { async inspectRepository() { inspected = true; return { repository: REPOSITORY, commitSha: COMMIT, blockers: [], gates: { treeComplete: true } }; } };
+    options.sandbox.run = async () => { commands += 1; throw new Error("must not execute"); };
+    await assert.rejects(runPinnedVerification(options), /checkpoint already exists; reconcile the existing run before retrying/);
+    assert.equal(inspected, false);
+    assert.equal(commands, 0);
+  });
+});
+
+test("evidence persistence failure marks checkpoint failed and propagates the write error", async () => {
+  await withTempDir(async (directory) => {
+    const options = input(directory);
+    const evidenceParent = join(directory, "evidence");
+    const fs = await import("node:fs/promises");
+    await fs.mkdir(evidenceParent, { recursive: true });
+    let commandCount = 0;
+    options.sandbox.run = async ({ command }) => {
+      commandCount += 1;
+      if (command === "git rev-parse HEAD") {
+        return { status: "passed", exitCode: 0, stdout: COMMIT + "\\n", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null };
+      }
+      await fs.rm(evidenceParent, { recursive: true, force: true });
+      await fs.writeFile(evidenceParent, "replace evidence directory with a file", "utf8");
+      return { status: "passed", exitCode: 0, stdout: "tests passed", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null };
+    };
+    await assert.rejects(runPinnedVerification(options));
+    assert.equal(commandCount, 2);
+    const checkpoint = JSON.parse(await fs.readFile(options.checkpointPath, "utf8"));
+    assert.equal(checkpoint.status, "failed");
+    assert.equal(checkpoint.nextStep, "reconcile_evidence_write");
+  });
+});
