@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { access, link, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { saveCheckpoint } from "./checkpoint_store.js";
+import { acquireRunLease } from "./run_lease.js";
 
 const SHA_PATTERN = /^[a-f0-9]{40}$/i;
 const SAFE_RUN_ID = /^[A-Za-z0-9._-]{1,100}$/;
@@ -112,7 +113,7 @@ function checkpointFor(input, commitSha, status, nextStep, completedSteps) {
  * The caller must supply an isolated workspace. Path containment is only a
  * guardrail; it is not an OS sandbox and does not make repository scripts safe.
  */
-export async function runPinnedVerification(input = {}) {
+async function runPinnedVerificationUnlocked(input = {}) {
   const taskId = requireText(input.taskId, "taskId");
   const repository = requireText(input.repository, "repository");
   const ref = requireText(input.ref, "ref");
@@ -235,4 +236,24 @@ export async function runPinnedVerification(input = {}) {
     completedSteps,
   ));
   return { status, evidence };
+}
+
+
+/**
+ * Serializes a run ID before repository inspection or sandbox execution.
+ * A process crash leaves a lease behind; recovery is intentionally fail-closed
+ * and requires explicit operator reconciliation. This is not a distributed
+ * fencing service; production multi-host execution needs a shared lease store.
+ */
+export async function runPinnedVerification(input = {}) {
+  if (typeof input.checkpointPath !== "string" || !isAbsolute(input.checkpointPath)) {
+    throw new TypeError("checkpointPath must be an absolute path");
+  }
+  const runId = requireText(input.runId, "runId");
+  const lease = await acquireRunLease(resolve(input.checkpointPath) + ".lease", runId);
+  try {
+    return await runPinnedVerificationUnlocked(input);
+  } finally {
+    await lease.release();
+  }
 }

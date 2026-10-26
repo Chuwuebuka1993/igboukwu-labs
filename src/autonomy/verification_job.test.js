@@ -186,3 +186,77 @@ test("verification job refuses to execute without a trusted sandbox adapter", as
     assert.equal(inspected, false);
   });
 });
+
+
+test("overlapping verification calls cannot execute the same run twice", async () => {
+  await withTempDir(async (directory) => {
+    let announceInspection;
+    let releaseInspection;
+    const inspectionStarted = new Promise((resolve) => { announceInspection = resolve; });
+    const inspectionGate = new Promise((resolve) => { releaseInspection = resolve; });
+    let commandCount = 0;
+    const options = input(directory, {
+      adapter: {
+        async inspectRepository() {
+          announceInspection();
+          await inspectionGate;
+          return { repository: REPOSITORY, commitSha: COMMIT, blockers: [], gates: { treeComplete: true } };
+        },
+      },
+      runner: async ({ command }) => {
+        commandCount += 1;
+        return command === "git rev-parse HEAD"
+          ? { status: "passed", exitCode: 0, stdout: COMMIT + "\n", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null }
+          : { status: "passed", exitCode: 0, stdout: "tests passed", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null };
+      },
+    });
+    const first = runPinnedVerification(options);
+    await inspectionStarted;
+    await assert.rejects(runPinnedVerification(options), /run lease already exists/);
+    releaseInspection();
+    const result = await first;
+    assert.equal(result.status, "TESTS_PASSED");
+    assert.equal(commandCount, 2, "only the lease owner should run HEAD check and verification command");
+  });
+});
+
+
+test("malformed existing checkpoint fails closed before repository inspection or execution", async () => {
+  await withTempDir(async (directory) => {
+    const options = input(directory);
+    await (await import("node:fs/promises")).mkdir(join(directory, "state"), { recursive: true });
+    await (await import("node:fs/promises")).writeFile(options.checkpointPath, "{ malformed checkpoint", "utf8");
+    let inspected = false;
+    let commands = 0;
+    options.adapter = { async inspectRepository() { inspected = true; return { repository: REPOSITORY, commitSha: COMMIT, blockers: [], gates: { treeComplete: true } }; } };
+    options.sandbox.run = async () => { commands += 1; throw new Error("must not execute"); };
+    await assert.rejects(runPinnedVerification(options), /checkpoint already exists; reconcile the existing run before retrying/);
+    assert.equal(inspected, false);
+    assert.equal(commands, 0);
+  });
+});
+
+test("evidence persistence failure marks checkpoint failed and propagates the write error", async () => {
+  await withTempDir(async (directory) => {
+    const options = input(directory);
+    const evidenceParent = join(directory, "evidence");
+    const fs = await import("node:fs/promises");
+    await fs.mkdir(evidenceParent, { recursive: true });
+    let commandCount = 0;
+    options.sandbox.run = async ({ command }) => {
+      commandCount += 1;
+      if (command === "git rev-parse HEAD") {
+        return { status: "passed", exitCode: 0, stdout: COMMIT + "\n", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null };
+      }
+      // Simulate a competing writer winning the exclusive artifact path after
+      // the preflight absence check but before the evidence hard-link is created.
+      await fs.writeFile(options.evidencePath, "competing artifact", { encoding: "utf8", flag: "wx" });
+      return { status: "passed", exitCode: 0, stdout: "tests passed", stderr: "", timedOut: false, outputLimitExceeded: false, signal: null };
+    };
+    await assert.rejects(runPinnedVerification(options));
+    assert.equal(commandCount, 2);
+    const checkpoint = JSON.parse(await fs.readFile(options.checkpointPath, "utf8"));
+    assert.equal(checkpoint.status, "failed");
+    assert.equal(checkpoint.nextStep, "reconcile_evidence_write");
+  });
+});
